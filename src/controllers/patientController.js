@@ -104,9 +104,20 @@ export const getPatientById = async (req, res, next) => {
       });
     }
 
+    const patientData = patient.toObject ? patient.toObject() : patient;
+    if (!patientData.conditionHistory || patientData.conditionHistory.length === 0) {
+      patientData.conditionHistory = [
+        {
+          condition: patientData.condition,
+          notes: patientData.notes || 'Initial admission assessment',
+          recordedAt: patientData.createdAt || new Date(),
+        },
+      ];
+    }
+
     res.status(200).json({
       success: true,
-      data: patient,
+      data: patientData,
     });
   } catch (error) {
     next(error);
@@ -130,7 +141,18 @@ export const createPatient = async (req, res, next) => {
       });
     }
 
-    const patient = await Patient.create(req.body);
+    const payload = {
+      ...req.body,
+      conditionHistory: [
+        {
+          condition: req.body.condition,
+          notes: req.body.notes || 'Initial admission assessment',
+          recordedAt: new Date(),
+        },
+      ],
+    };
+
+    const patient = await Patient.create(payload);
     await patient.populate('doctor', 'name specialization hospital email phone');
 
     res.status(201).json({
@@ -149,6 +171,14 @@ export const createPatient = async (req, res, next) => {
  */
 export const updatePatient = async (req, res, next) => {
   try {
+    const existingPatient = await Patient.findById(req.params.id);
+    if (!existingPatient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found',
+      });
+    }
+
     if (req.body.doctor) {
       const doctorExists = await Doctor.findById(req.body.doctor);
       if (!doctorExists) {
@@ -159,17 +189,28 @@ export const updatePatient = async (req, res, next) => {
       }
     }
 
-    const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, {
+    const updates = { ...req.body };
+
+    const isConditionChanged =
+      req.body.condition && req.body.condition !== existingPatient.condition;
+    const isNewNotesProvided =
+      req.body.notes !== undefined && req.body.notes !== existingPatient.notes;
+
+    if (isConditionChanged || isNewNotesProvided) {
+      const newHistoryEntry = {
+        condition: req.body.condition || existingPatient.condition,
+        notes:
+          req.body.notes ||
+          (isConditionChanged ? `Condition transitioned to ${req.body.condition}` : ''),
+        recordedAt: new Date(),
+      };
+      updates.$push = { conditionHistory: newHistoryEntry };
+    }
+
+    const patient = await Patient.findByIdAndUpdate(req.params.id, updates, {
       new: true,
       runValidators: true,
     }).populate('doctor', 'name specialization hospital email phone');
-
-    if (!patient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Patient not found',
-      });
-    }
 
     res.status(200).json({
       success: true,
