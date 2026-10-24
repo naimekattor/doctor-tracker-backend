@@ -35,6 +35,29 @@ const patientSchema = new mongoose.Schema(
       required: [true, 'Doctor reference is required'],
       index: true, // For foreign key lookups and aggregation
     },
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    conditionHistory: [
+      {
+        condition: {
+          type: String,
+          enum: ['Stable', 'Critical', 'Under Observation', 'Recovered', 'Chronic', 'Routine Checkup'],
+          required: true,
+        },
+        notes: {
+          type: String,
+          trim: true,
+          default: '',
+        },
+        recordedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
