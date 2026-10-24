@@ -36,6 +36,28 @@ export const createPatientSchema = z
     doctor: z
       .string({ required_error: 'Doctor reference is required' })
       .regex(/^[0-9a-fA-F]{24}$/, 'Invalid doctor ID format: must be 24-character hex ObjectId'),
+    notes: z
+      .string()
+      .trim()
+      .max(2000, 'Notes cannot exceed 2000 characters')
+      .optional()
+      .default(''),
+    conditionHistory: z
+      .array(
+        z.object({
+          condition: z.enum([
+            'Stable',
+            'Critical',
+            'Under Observation',
+            'Recovered',
+            'Chronic',
+            'Routine Checkup',
+          ]),
+          notes: z.string().optional().default(''),
+          recordedAt: z.coerce.date().optional(),
+        })
+      )
+      .optional(),
   })
   .strict();
 
